@@ -655,6 +655,8 @@ export function fold(state, ev, ctx = {}) {
     case 'repair.finished': {
       const o = findOrder(p.orderId)
       if (!o || o.status !== 'accepted') return reject('illegal-status')
+      // 进度未满 100% 的提前完工属非法跳转：记冲突账，不进入待验收
+      if ((o.progress || 0) < 100) return reject('progress-incomplete')
       applyUsed(o, p.used || {})
       o.progress = 100; o.status = 'done'; o.doneAt = at
       o.logs.push({ at, text: '🏁 完工上报，待验收' })

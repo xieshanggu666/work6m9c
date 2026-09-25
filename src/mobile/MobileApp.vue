@@ -107,7 +107,8 @@
               <label>实际用人 <input v-model.number="progForm[o.id + '_p']" type="number" min="0" /></label>
               <label>实际用车 <input v-model.number="progForm[o.id + '_v']" type="number" min="0" /></label>
             </div>
-            <button class="primary" @click="finish(o)">完工上报（待验收）</button>
+            <button class="primary" :disabled="o.progress < 100" @click="finish(o)">完工上报（待验收）</button>
+            <p v-if="o.progress < 100" class="tip">进度达 100% 后才能完工上报（当前 {{ o.progress }}%）</p>
           </template>
         </details>
       </section>
@@ -275,6 +276,7 @@ function delay(o) {
   client.enqueue('reportRepair', { orderId: o.id, stage: 'delay', deadline: progForm[o.id + '_deadline'] || '' })
 }
 function finish(o) {
+  if ((o.progress || 0) < 100) return alert(`进度未达到 100%（当前 ${o.progress || 0}%），不能完工上报`)
   client.enqueue('reportRepair', {
     orderId: o.id, stage: 'finish',
     used: { personnel: Math.round(progForm[o.id + '_p'] || 0), vehicles: Math.round(progForm[o.id + '_v'] || 0) }

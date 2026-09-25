@@ -220,6 +220,7 @@ async function main() {
     actions: [
       { clientActionId: 'rp-1', kind: 'reportRepair', teamId: TEAM, orderId: order.id, stage: 'accept', at: '12:20', hlc: hlc(t0 + 12000) },
       { clientActionId: 'rp-2', kind: 'reportRepair', teamId: TEAM, orderId: order.id, stage: 'progress', progress: 40, at: '13:10', hlc: hlc(t0 + 13000) },
+      { clientActionId: 'rp-2b', kind: 'reportRepair', teamId: TEAM, orderId: order.id, stage: 'finish', used: { personnel: 6, vehicles: 2 }, at: '13:15', hlc: hlc(t0 + 13500) },
       { clientActionId: 'rp-3', kind: 'reportRepair', teamId: TEAM, orderId: order.id, stage: 'progress', progress: 30, at: '13:20', hlc: hlc(t0 + 14000) },
       { clientActionId: 'rp-4', kind: 'reportRepair', teamId: TEAM, orderId: order.id, stage: 'progress', progress: 100, at: '14:30', hlc: hlc(t0 + 15000) },
       { clientActionId: 'rp-5', kind: 'reportRepair', teamId: TEAM, orderId: order.id, stage: 'finish', used: { personnel: 6, vehicles: 2 }, at: '14:35', hlc: hlc(t0 + 16000) }
@@ -227,12 +228,14 @@ async function main() {
   })
   const rr = j(r).results
   assert(rr[0].applied && rr[1].applied, '接单 + 进度 40% 生效')
-  assert(rr[2].ok === false, '进度回退（40→30）被前置校验拒绝（快速失败），不阻塞后续动作')
-  assert(rr[3].applied && rr[4].applied, '进度 100% 与完工继续生效')
+  assert(rr[2].ok === false, '进度 40% 时提前完工被前置校验拒绝，不阻塞后续动作')
+  assert(rr[3].ok === false, '进度回退（40→30）被前置校验拒绝（快速失败），不阻塞后续动作')
+  assert(rr[4].applied && rr[5].applied, '进度 100% 与完工继续生效')
   st = await stateOf(SIM)
   let o2 = st.orders.find((x) => x.id === order.id)
   assertEq(o2.progress, 100, '最终进度 100（回退帧被丢弃）')
   assertEq(o2.status, 'done', '完工进入待验收，阻断仍封闭')
+  assertEq(o2.doneAt, '14:35', '完工时间取自 100% 后的合法完工帧（提前完工帧未生效）')
   assertEq(st.blocks.find((b) => b.id === blk2.id).status, 'active', '完工未验收前道路保持封闭')
   // 指挥员验收 → 解除封闭 + 剩余资源归还（实际用人 6/8）
   r = await POST(`/sims/${SIM}/commands/acceptWork`, { clientId: 'cmdr', orderId: order.id, at: '15:00' })

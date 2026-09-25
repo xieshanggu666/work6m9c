@@ -97,8 +97,16 @@ s5 = fold(s5, { id: 'blk2', type: 'block.reported', payload: { name: '需抢修'
 const pers0 = s5.bases.find((b) => b.id === 'rb-1').stock.personnel
 s5 = fold(s5, { id: 'ro1', type: 'repair.created', payload: { blockId: 'blk2', baseId: 'rb-1', personnel: 10, vehicles: 2, materials: [{ type: 'water', qty: 20 }] }, at: '13:10' })
 assert(s5.bases.find((b) => b.id === 'rb-1').stock.personnel === pers0 - 10, '抢修出库人员 10')
+s5 = fold(s5, { id: 'ra1', type: 'repair.accepted', payload: { orderId: 'ro1' }, at: '13:20' })
+// 进度未满 100% 的提前完工属非法跳转：记冲突账，工单保持抢修中
+s5 = fold(s5, { id: 'rf0', type: 'repair.finished', payload: { orderId: 'ro1', used: { personnel: 4 } }, at: '14:00' })
+const roEarly = s5.orders.find((x) => x.id === 'ro1')
+assert(roEarly.status === 'accepted' && roEarly.progress === 0, '提前完工被拒：工单仍抢修中、进度不变')
+assert(roEarly.personnelUsed === 0, '提前完工被拒：不登记实际消耗')
+assert(s5.conflicts.some((c) => c.eventId === 'rf0' && c.reason === 'progress-incomplete'), '提前完工记入冲突账')
+assert(s5.blocks.find((b) => b.id === 'blk2').status === 'active', '提前完工被拒：阻断保持封闭')
 s5 = foldAll(s5, [
-  { id: 'ra1', type: 'repair.accepted', payload: { orderId: 'ro1' }, at: '13:20' },
+  { id: 'rp1', type: 'repair.progress', payload: { orderId: 'ro1', progress: 100 }, at: '14:30' },
   { id: 'rf1', type: 'repair.finished', payload: { orderId: 'ro1', used: { personnel: 4, vehicles: 1, materials: { water: 15 } } }, at: '15:00' },
   { id: 'rw1', type: 'repair.acceptedWork', payload: { orderId: 'ro1' }, at: '15:30' }
 ])
@@ -108,6 +116,22 @@ assert(s5.blocks.find((b) => b.id === 'blk2').status === 'cleared', '验收联�
 // 结算归还：人员 10-4=6，车 2-1=1，水 20-15=5
 assert(s5.bases.find((b) => b.id === 'rb-1').stock.personnel === pers0 - 4, '剩余人员归还（净耗 4）')
 assert(ro.settled === true && ro.settlement.personnel === 6, '结算单记录归还 6 人')
+
+console.log('— 抢修完工命令前置校验：进度未满 100% 快速失败 —')
+let s5b = newSim()
+s5b = fold(s5b, { id: 'blk3', type: 'block.reported', payload: { name: '需抢修2', polygon: poly.map((p) => [p[0] + 0.6, p[1]]) }, at: '13:00' })
+s5b = foldAll(s5b, [
+  { id: 'ro2', type: 'repair.created', payload: { blockId: 'blk3', baseId: 'rb-1', personnel: 4 }, at: '13:10' },
+  { id: 'ra2', type: 'repair.accepted', payload: { orderId: 'ro2' }, at: '13:20' },
+  { id: 'rp2', type: 'repair.progress', payload: { orderId: 'ro2', progress: 70 }, at: '13:40' }
+])
+const finEarly = buildCommand(s5b, 'finishOrder', { orderId: 'ro2', used: { personnel: 1 }, at: '13:50' })
+assert(finEarly.ok === false && /100%/.test(finEarly.msg || ''), '进度 70% 时完工命令被前置校验拒绝')
+const finOk = buildCommand(s5b, 'finishOrder', { orderId: 'ro2', used: { personnel: 1 }, at: '13:55' })
+assert(finOk.ok === false, '进度仍未满 100%，持续拒绝')
+s5b = fold(s5b, { id: 'rp3', type: 'repair.progress', payload: { orderId: 'ro2', progress: 100 }, at: '13:58' })
+const finOk2 = buildCommand(s5b, 'finishOrder', { orderId: 'ro2', used: { personnel: 1 }, at: '14:00' })
+assert(finOk2.ok === true && finOk2.events[0].type === 'repair.finished', '进度 100% 后完工命令放行')
 
 console.log('— 旧快照迁移（state.snapshot）—')
 let s6 = createState()

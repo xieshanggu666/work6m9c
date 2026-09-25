@@ -85,6 +85,12 @@ assert(blk.status === 'active', '延期后阻断仍然生效')
 assert(!!rb.activeBlocks.find((b) => b.id === blk.id), '延期阻断仍在生效清单')
 
 console.log('— 完工上报实际消耗：阻断保留待验收 —')
+const earlyFin = rp.finishOrder(order.id, { personnel: 18 })
+assert(!earlyFin.ok && earlyFin.msg.includes('100%'), '进度 60% 时完工上报被拦截')
+assert(order.status === 'accepted' && order.progress === 60, '提前完工被拒后工单仍为抢修中、进度不变')
+assert(order.personnelUsed === 0 && order.materials[0].used === 0, '提前完工被拒不登记实际消耗')
+assert(blk.status === 'active', '提前完工被拒后阻断仍生效')
+assert(rp.reportProgress(order.id, { progress: 100 }).ok, '上报 100%')
 const fin = rp.finishOrder(order.id, {
   personnel: 18, vehicles: 1,
   materials: { medical: 40 }
@@ -141,6 +147,9 @@ const r3 = rp.createOrder({
 const o3 = r3.order
 rp.acceptOrder(o3.id)
 rp.reportProgress(o3.id, { progress: 80 })
+assert(!rp.finishOrder(o3.id, { personnel: 12 }).ok, '进度 80% 时完工上报被拦截')
+assert(o3.status === 'accepted' && o3.personnelUsed === 0, '提前完工被拒后状态与消耗不变')
+rp.reportProgress(o3.id, { progress: 100 })
 assert(rp.finishOrder(o3.id, { personnel: 12, vehicles: 2, materials: { food: 35 } }).ok, '完工待验收')
 assert(rp.failOrder(o3.id, { reason: '夜间二次塌方，抢通段复损' }).ok, '验收不通过转失败')
 assert(o3.status === 'failed' && blk3.status === 'active', '失败工单关闭、阻断保留')
@@ -169,6 +178,7 @@ const blk5 = rb.reportBlock({ name: '阻断5-强制恢复B', polygon: midPoly })
 const before5 = { personnel: base1().stock.personnel, medical: base1().stock.medical }
 const o5 = rp.createOrder({ blockId: blk5.id, baseId: 'rb-1', personnel: 6, materials: [{ type: 'medical', qty: 20 }] }).order
 rp.acceptOrder(o5.id)
+rp.reportProgress(o5.id, { progress: 100 })
 rp.finishOrder(o5.id, { personnel: 2, materials: { medical: 5 } })
 rb.clearBlock(blk5.id)
 assert(o5.status === 'cleared', '待验收工单随阻断恢复视同验收通过自动办结')
@@ -184,6 +194,7 @@ const a2 = rp.createOrder({ blockId: rb.reportBlock({ name: 's2', polygon: midPo
 assert(rp.workingCount === 2, '两个待接单工单计入抢修中')
 assert(rp.verifyCount === 0, '暂无待验收')
 rp.acceptOrder(a1.id)
+rp.reportProgress(a1.id, { progress: 100 })
 rp.finishOrder(a1.id, { personnel: 0 })
 assert(rp.workingCount === 1 && rp.verifyCount === 1, '完工后抢修中-1、待验收+1')
 rp.acceptWork(a1.id)
