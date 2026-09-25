@@ -252,6 +252,7 @@ const COMMANDS = {
   finishOrder(state, { orderId, used, at }) {
     const o = state.orders.find((x) => x.id === orderId)
     if (!o || o.status !== 'accepted') return bad('仅抢修中工单可完工')
+    if (o.progress < 100) return bad(`抢修进度需达到 100% 才能完工上报（当前 ${o.progress}%）`)
     return ok(ev('repair.finished', { orderId, used: used || {} }, { at }))
   },
   delayOrder(state, { orderId, reason, deadline, at }) {

@@ -99,6 +99,13 @@ s5 = fold(s5, { id: 'ro1', type: 'repair.created', payload: { blockId: 'blk2', b
 assert(s5.bases.find((b) => b.id === 'rb-1').stock.personnel === pers0 - 10, '抢修出库人员 10')
 s5 = foldAll(s5, [
   { id: 'ra1', type: 'repair.accepted', payload: { orderId: 'ro1' }, at: '13:20' },
+  { id: 'rp1', type: 'repair.progress', payload: { orderId: 'ro1', progress: 60 }, at: '14:00' }
+])
+const earlyFinish = fold(s5, { id: 'rf0', type: 'repair.finished', payload: { orderId: 'ro1', used: { personnel: 4 } }, at: '14:30' })
+assert(earlyFinish.orders.find((x) => x.id === 'ro1').status === 'accepted', '进度未满 100% 的完工事件被 reducer 拒绝')
+assert(earlyFinish.conflicts.some((c) => c.eventId === 'rf0' && c.reason.startsWith('progress-not-complete')), '提前完工冲突原因 progress-not-complete')
+s5 = foldAll(s5, [
+  { id: 'rp2', type: 'repair.progress', payload: { orderId: 'ro1', progress: 100 }, at: '14:50' },
   { id: 'rf1', type: 'repair.finished', payload: { orderId: 'ro1', used: { personnel: 4, vehicles: 1, materials: { water: 15 } } }, at: '15:00' },
   { id: 'rw1', type: 'repair.acceptedWork', payload: { orderId: 'ro1' }, at: '15:30' }
 ])

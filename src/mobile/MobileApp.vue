@@ -107,7 +107,7 @@
               <label>实际用人 <input v-model.number="progForm[o.id + '_p']" type="number" min="0" /></label>
               <label>实际用车 <input v-model.number="progForm[o.id + '_v']" type="number" min="0" /></label>
             </div>
-            <button class="primary" @click="finish(o)">完工上报（待验收）</button>
+            <button class="primary" :disabled="o.progress < 100" :title="o.progress < 100 ? `需进度达到 100% 才能完工上报（当前 ${o.progress}%）` : ''" @click="finish(o)">完工上报（待验收）{{ o.progress < 100 ? `·需100%（${o.progress}%）` : '' }}</button>
           </template>
         </details>
       </section>

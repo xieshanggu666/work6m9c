@@ -169,11 +169,12 @@ export const useRepairStore = defineStore('repair', {
       return { ok: true, progress }
     },
 
-    // 现场完工上报：记录实际消耗，进入待验收（阻断仍保留，验收通过才解除）
+    // 现场完工上报：进度必须达到 100%；记录实际消耗，进入待验收（阻断仍保留，验收通过才解除）
     finishOrder(orderId, used = {}) {
       const o = this._order(orderId)
       if (!o) return { ok: false, msg: '工单不存在' }
       if (o.status !== 'accepted') return { ok: false, msg: '仅抢修中的工单可上报完工' }
+      if (o.progress < 100) return { ok: false, msg: `抢修进度需达到 100% 才能完工上报（当前 ${o.progress}%）` }
       this._applyUsed(o, used)
       o.progress = 100
       o.status = 'done'

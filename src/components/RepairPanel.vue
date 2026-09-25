@@ -96,7 +96,7 @@
         <button v-if="o.status === 'dispatched'" class="act sign" @click="onAccept(o)">🙋 现场接单</button>
         <template v-if="o.status === 'accepted'">
           <button class="act prog" @click="openForm(o, 'progress')">📍 上报进度{{ o.progress ? `（${o.progress}%）` : '' }}</button>
-          <button class="act finish" @click="openForm(o, 'finish')">🏁 完工上报</button>
+          <button class="act finish" :disabled="o.progress < 100" :title="o.progress < 100 ? `需进度达到 100% 才能完工上报（当前 ${o.progress}%）` : ''" @click="openForm(o, 'finish')">🏁 完工上报{{ o.progress < 100 ? `（${o.progress}/100）` : '' }}</button>
           <button class="act delay" @click="openForm(o, 'delay')">⏰ 延期</button>
         </template>
         <button v-if="o.status === 'done'" class="act verify" @click="onAcceptWork(o)">✅ 验收通过·解除封闭</button>
@@ -453,6 +453,8 @@ watch(() => repair.focusOrderId, (id) => {
   color: #8ba2c8; font-size: 10px; border-radius: 5px; padding: 3px 8px; cursor: pointer;
 }
 .act:hover { color: #fff; border-color: #4d8dff; }
+.act:disabled { opacity: 0.45; cursor: not-allowed; }
+.act:disabled:hover { color: #8ba2c8; border-color: rgba(120,160,220,0.25); background: transparent; }
 .act.sign { border-color: rgba(38,166,154,0.45); color: #7ef0c9; }
 .act.sign:hover { background: rgba(38,166,154,0.15); }
 .act.prog { border-color: rgba(41,98,255,0.5); color: #7ea8e8; }
